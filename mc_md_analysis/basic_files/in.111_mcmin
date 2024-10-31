@@ -1,0 +1,67 @@
+units metal
+boundary p p p
+atom_style atomic
+neighbor 0.2 bin
+timestep 0.001
+
+lattice fcc 3.954 orient x 1 1 -2 orient y -1 1 0 orient z 1 1 1
+region box block 0 10 0 10 -0.5 16
+create_box 5 box
+
+#Considering the boundary tolerance, offset 0.1
+region create block -0.1 9.9 -0.1 9.9 -0.1 4.9
+create_atoms 1 region create
+
+set type 1 type/ratio 2 0.05 123456
+
+pair_style eam/alloy
+pair_coeff * * CuAgAuNiPdPtAl_Zhou04.eam.alloy Pd Pt Al Ag Cu
+
+region bulk block INF INF INF INF INF 2.9
+group bulk region bulk
+region surface block INF INF INF INF 2.9 INF
+group surface region surface
+
+# set group bulk type 1
+# set group surface type 2
+# write_data check_surbulk_111.data
+# variable count_sur equal count(surface)
+# print "${count_sur}"
+# quit
+
+thermo 100
+thermo_style custom step temp pe ke press
+
+variable i loop 200
+label loop1
+
+variable type1 index 1 1 1 1 2 2 2 3 3 4
+variable type2 index 2 3 4 5 3 4 5 4 5 5
+
+label loop2
+
+# print "${type1} ${type2}" append type.dat
+
+fix 1 all atom/swap 1 100 123456 300 types ${type1} ${type2} region surface
+run 1
+unfix 1
+
+variable step equal step
+variable current_step equal ${step}
+
+fix 1 bulk setforce 0.0 0.0 0.0
+minimize 1e-15 1e-15 5000 5000
+unfix 1
+
+reset_timestep ${current_step}
+
+next type1
+next type2
+jump SELF loop2
+
+variable d equal "v_i % 10"
+if "${d} == 0" then &
+  "write_dump all custom mc.xyz id type x y z modify sort id append yes"
+
+next i
+jump SELF loop1

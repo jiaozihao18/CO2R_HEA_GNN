@@ -1,0 +1,47 @@
+#Initial Simulation System Setup
+units metal
+boundary p p p
+atom_style atomic
+neighbor 0.2 bin
+timestep 0.001
+
+#Build the model
+lattice fcc 3.56
+region box block 0 10 0 10 0 10
+create_box 2 box
+create_atoms 1 box
+
+#Atom Type Settings
+set type 1 type/ratio 2 0.67 123456
+
+#Defining the interatomic interaction potential
+pair_style eam/alloy
+pair_coeff * * CuAgAuNiPdPtAl_Zhou04.eam.alloy Ag Pd
+
+#Energy minimization
+fix 1 all box/relax iso 0.0
+min_style cg
+minimize 1e-10 1e-10 5000 5000
+unfix 1
+
+reset_timestep 0
+
+#Variable statistics
+variable lx equal lx
+variable ly equal ly
+variable lz equal lz
+fix aveL all ave/time 100 10 1000 v_lx v_ly v_lz start 35000 ave running
+variable aveL1 equal f_aveL[1]/10
+variable aveL2 equal f_aveL[2]/10
+variable aveL3 equal f_aveL[3]/10
+
+velocity all create 300 123456
+
+dump 1 all custom 1000 npt.xyz id type x y z
+dump_modify 1 sort id
+fix  1 all npt temp 820 820 0.1 iso 1 1 1
+
+thermo_style custom step temp pe ke press f_aveL[1] f_aveL[2] f_aveL[3]
+run 50000
+
+print "Lattice parameter: ${aveL1} ${aveL2} ${aveL3}" file lattice.dat
